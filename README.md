@@ -93,7 +93,6 @@ const char* serverName    = "https://<your-subdomain>.ui.nabu.casa";
 const char* bearerToken   = "YOUR_LONG_LIVED_TOKEN";
 ```
 
-⚠️ Note: If you are connecting **locally** to Home Assistant, you don’t need this buffer/automation mechanism — just use MQTT directly. This project is specifically for **remote device/entity setup via Nabu Casa**.
 
 ### 3. Upload and Run
 
