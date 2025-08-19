@@ -1,0 +1,127 @@
+alias: MQTT Publish via 6 Buffers (Discovery Only, Retained)
+description: >-
+  Publishes retained MQTT Discovery config to
+  homeassistant/<component>/<object_id>/config
+triggers:
+  - entity_id: input_text.mqtt_buffer_6
+    to: END
+    trigger: state
+conditions: []
+actions:
+  - variables:
+      b1: "{{ states('input_text.mqtt_buffer_1') or '' }}"
+      b2: "{{ states('input_text.mqtt_buffer_2') or '' }}"
+      b3: "{{ states('input_text.mqtt_buffer_3') or '' }}"
+      b4: "{{ states('input_text.mqtt_buffer_4') or '' }}"
+      b5: "{{ states('input_text.mqtt_buffer_5') or '' }}"
+      mqtt_message: "{{ (b1 ~ b2 ~ b3 ~ b4 ~ b5) | string }}"
+  - data:
+      level: info
+      message: Assembled MQTT JSON len={{ mqtt_message | length }}
+    action: system_log.write
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ mqtt_message | length == 0 }}"
+        sequence:
+          - data:
+              level: warning
+              message: Buffers empty on END
+            action: system_log.write
+      - conditions:
+          - condition: template
+            value_template: "{{ (mqtt_message | length) > (max_json_len | int) }}"
+        sequence:
+          - data:
+              level: error
+              message: >-
+                JSON too large ({{ mqtt_message | length }} > {{ max_json_len
+                }}) — dropping
+            action: system_log.write
+    default:
+      - variables:
+          parsed: "{{ mqtt_message | from_json(default=None) }}"
+      - if:
+          - condition: template
+            value_template: "{{ parsed is mapping }}"
+        then:
+          - variables:
+              req_topic: "{{ (parsed.topic | default('')) | string }}"
+              req_payload_obj: >-
+                {{ parsed.payload if parsed is mapping and 'payload' in parsed
+                else parsed }}
+              req_qos: "{{ parsed.qos | default(0) | int }}"
+          - variables:
+              topic_ok: |-
+                {{
+                  (req_topic | regex_match(discovery_topic_regex))
+                  and ('#' not in req_topic)
+                  and ('+' not in req_topic)
+                  and (not req_topic.startswith('$'))
+                }}
+          - if:
+              - condition: template
+                value_template: "{{ topic_ok }}"
+            then:
+              - variables:
+                  payload_is_empty: "{{ req_payload_obj == '' }}"
+                  payload_json: >-
+                    {{ '' if payload_is_empty else (req_payload_obj | to_json)
+                    }}
+              - if:
+                  - condition: template
+                    value_template: >-
+                      {{ payload_is_empty or (payload_json | length <=
+                      (max_payload_len | int)) }}
+                then:
+                  - variables:
+                      mqtt_qos: 0
+                      mqtt_retain: true
+                  - data:
+                      topic: "{{ req_topic }}"
+                      payload: "{{ payload_json }}"
+                      qos: "{{ mqtt_qos }}"
+                      retain: "{{ mqtt_retain }}"
+                    action: mqtt.publish
+                  - data:
+                      level: info
+                      message: >-
+                        MQTT discovery publish ok topic={{ req_topic }}
+                        retained=true deleted={{ payload_is_empty }}
+                    action: system_log.write
+                else:
+                  - data:
+                      level: error
+                      message: >-
+                        Payload too large ({{ payload_json | length }} > {{
+                        max_payload_len }}) — dropping
+                    action: system_log.write
+            else:
+              - data:
+                  level: error
+                  message: "Topic rejected (not discovery config): {{ req_topic }}"
+                action: system_log.write
+        else:
+          - data:
+              level: error
+              message: Invalid JSON (not an object) — dropping
+            action: system_log.write
+  - target:
+      entity_id:
+        - input_text.mqtt_buffer_1
+        - input_text.mqtt_buffer_2
+        - input_text.mqtt_buffer_3
+        - input_text.mqtt_buffer_4
+        - input_text.mqtt_buffer_5
+        - input_text.mqtt_buffer_6
+    data:
+      value: ""
+    action: input_text.set_value
+  - delay:
+      milliseconds: 100
+mode: queued
+max: 5
+variables:
+  discovery_topic_regex: ^homeassistant/[^/]+/[^/]+/config$
+  max_json_len: 8192
+  max_payload_len: 16384
