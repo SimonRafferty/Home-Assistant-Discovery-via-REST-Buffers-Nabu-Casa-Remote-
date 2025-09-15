@@ -2,6 +2,8 @@
 
 An Arduino library for ESP32 that enables Home Assistant MQTT Discovery via REST API and input_text helpers. This library allows you to create and manage Home Assistant entities (switches, numbers, sensors, binary sensors) without requiring direct MQTT broker access.
 
+This partially removes the MQTT restriction when connecting via Nabu Casa, without compromising security (as much). 
+
 ## Features
 
 - **Multiple Entity Types**: Support for switches, numbers, sensors, and binary sensors
@@ -254,11 +256,11 @@ bool isControlOnline(HAControl* control)                    // Check if accessib
 
 ## Best Practices
 
-1. **Always provide full parameters** for production use - HA works best with complete entity definitions
+1. **Always provide full parameters** - HA works best with complete entity definitions
 2. **Use meaningful objectIds** - they become part of the entity_id in HA
 3. **Make uniqueIds globally unique** - include device info or random elements
 4. **Choose appropriate icons** - use Material Design Icons (mdi:...)
-5. **Set custom MQTT topics** if integrating with existing MQTT structure
+5. **Set custom MQTT topics** - if integrating with existing MQTT structure
 6. **Check return values** - functions return nullptr/false on failure
 7. **Monitor entity status** - use isControlOnline() for health checks
 
@@ -273,10 +275,8 @@ The library includes comprehensive error handling:
 
 ## Limitations
 
-- Maximum 50 controls per instance
 - Discovery payload limited to 1275 characters (5 × 255)
 - Requires Home Assistant automation for MQTT publishing
-- Uses `setInsecure()` for HTTPS (consider certificate validation for production)
 
 ## Examples
 
@@ -285,13 +285,6 @@ See `examples/BasicUsage/` for a complete working example with multiple entity t
 ## Security Notes
 
 - Currently uses `setInsecure()` for HTTPS connections
-- For production, consider implementing proper certificate validation
-- Keep your long-lived access token secure
-- Use strong WiFi passwords
-
-## Contributing
-
-Contributions are welcome! Please submit pull requests for improvements.
 
 ## License
 
